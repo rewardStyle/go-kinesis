@@ -383,9 +383,10 @@ func (kinesis *Kinesis) GetShardIterator(args *RequestArgs) (resp *GetShardItera
 
 // GetNextRecordsRecords stores the information that provides by GetNextRecordsResp
 type GetRecordsRecords struct {
-	Data           []byte
-	PartitionKey   string
-	SequenceNumber string
+	ApproximateArrivalTimestamp float64
+	Data                        []byte
+	PartitionKey                string
+	SequenceNumber              string
 }
 
 func (r GetRecordsRecords) GetData() []byte {
