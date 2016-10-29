@@ -16,10 +16,12 @@ const (
 	AccessEnvKeyId     = "AWS_ACCESS_KEY_ID"
 	SecretEnvKey       = "AWS_SECRET_KEY"
 	SecretEnvAccessKey = "AWS_SECRET_ACCESS_KEY"
+	EcsMetadataEnvKey  = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
 
-	AWSMetadataServer = "169.254.169.254"
-	AWSIAMCredsPath   = "/latest/meta-data/iam/security-credentials"
-	AWSIAMCredsURL    = "http://" + AWSMetadataServer + "/" + AWSIAMCredsPath
+	AWSMetadataServer    = "169.254.169.254"
+	AWSEcsMetadataServer = "169.254.170.2"
+	AWSIAMCredsPath      = "/latest/meta-data/iam/security-credentials"
+	AWSIAMCredsURL       = "http://" + AWSMetadataServer + "/" + AWSIAMCredsPath
 )
 
 // Auth interface for authentication credentials and information
@@ -115,15 +117,21 @@ func (a *AuthCredentials) GetAccessKey() string {
 }
 
 // Renew retrieves a new token and mutates it on an instance of the Auth struct
-func (a *AuthCredentials) Renew() error {
-	role, err := retrieveIAMRole()
-	if err != nil {
-		return err
-	}
+func (a *AuthCredentials) Renew() (err error) {
+	var data map[string]string
+	relativeUri := os.Getenv(EcsMetadataEnvKey)
+	if relativeUri != "" {
+		data, err = retrieveAWSCredentials(fmt.Sprintf("http://%s%s", AWSEcsMetadataServer, relativeUri))
+	} else {
+		role, err := retrieveIAMRole()
+		if err != nil {
+			return err
+		}
 
-	data, err := retrieveAWSCredentials(role)
-	if err != nil {
-		return err
+		data, err = retrieveAWSCredentials(fmt.Sprintf("%s/%s", AWSIAMCredsURL, role))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Ignore the error, it just means we won't be able to refresh the
@@ -148,10 +156,10 @@ func (a *AuthCredentials) Sign(s *Service, t time.Time) []byte {
 	return h
 }
 
-func retrieveAWSCredentials(role string) (map[string]string, error) {
+func retrieveAWSCredentials(url string) (map[string]string, error) {
 	var bodybytes []byte
 	// Retrieve the json for this role
-	resp, err := http.Get(fmt.Sprintf("%s/%s", AWSIAMCredsURL, role))
+	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return nil, err
 	}
