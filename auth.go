@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -136,7 +137,12 @@ func (a *AuthCredentials) Renew() (err error) {
 
 	// Ignore the error, it just means we won't be able to refresh the
 	// credentials when they expire.
-	expiry, _ := time.Parse(time.RFC3339, data["Expiration"])
+	expiry, err := time.Parse(time.RFC3339, data["Expiration"])
+	if err != nil {
+		return err
+	}
+
+	log.Println("Renewed AWS credentials, new expiry: ", expiry.String())
 
 	a.expiry = expiry
 	a.accessKey = data["AccessKeyId"]
